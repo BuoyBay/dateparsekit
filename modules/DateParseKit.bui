@@ -1,0 +1,241 @@
+''' A validated timestamp, retaining source offset and precision alongside its UTC instant.
+Public Class ParsedTimestamp
+    Private Property mOriginal As String
+    Private Property mMillis As Integer
+    Private Property mOffset As Integer
+    Private Property mFractionDigits As Integer
+    Private Property mUTCYear As Integer
+    Private Property mUTCMonth As Integer
+    Private Property mUTCDay As Integer
+    Private Property mUTCHour As Integer
+    Private Property mUTCMinute As Integer
+    Private Property mUTCSecond As Integer
+    Private Property mUTCMillisecond As Integer
+
+    Internal Sub Constructor(original As String, millis As Integer, offset As Integer, fractionDigits As Integer)
+        mOriginal = original
+        mMillis = millis
+        mOffset = offset
+        mFractionDigits = fractionDigits
+        ' Floor into UTC days before splitting, including negative/pre-epoch values.
+        Dim utcDays As Integer = millis \ 86400000
+        Dim dayMillis As Integer = millis Mod 86400000
+        If dayMillis < 0 Then
+            utcDays -= 1
+            dayMillis += 86400000
+        End If
+        Dim absoluteDays As Integer = utcDays + 719162
+        Dim low As Integer = 1
+        Dim high As Integer = 10000
+        While low + 1 < high
+            Dim middle As Integer = (low + high) \ 2
+            If TimestampDaysBeforeYear(middle) <= absoluteDays Then
+                low = middle
+            Else
+                high = middle
+            End If
+        End While
+        mUTCYear = low
+        Dim remaining As Integer = absoluteDays - TimestampDaysBeforeYear(low)
+        mUTCMonth = 1
+        While remaining >= TimestampMonthDays(mUTCYear, mUTCMonth)
+            remaining -= TimestampMonthDays(mUTCYear, mUTCMonth)
+            mUTCMonth += 1
+        End While
+        mUTCDay = remaining + 1
+        mUTCHour = dayMillis \ 3600000
+        mUTCMinute = (dayMillis Mod 3600000) \ 60000
+        mUTCSecond = (dayMillis Mod 60000) \ 1000
+        mUTCMillisecond = dayMillis Mod 1000
+    End Sub
+
+    Public Property OriginalText As String
+        Get
+            Return mOriginal
+        End Get
+    End Property
+
+    Public Property UnixMillis As Integer
+        Get
+            Return mMillis
+        End Get
+    End Property
+
+    Public Property Instant As DateTime
+        Get
+            Return DateTime.FromUnixMillis(mMillis, TimeZone.Utc)
+        End Get
+    End Property
+
+    Public Property OffsetSeconds As Integer
+        Get
+            Return mOffset
+        End Get
+    End Property
+
+    Public Property FractionDigits As Integer
+        Get
+            Return mFractionDigits
+        End Get
+    End Property
+
+    Public Property UTCYear As Integer
+        Get
+            Return mUTCYear
+        End Get
+    End Property
+    Public Property UTCMonth As Integer
+        Get
+            Return mUTCMonth
+        End Get
+    End Property
+    Public Property UTCDay As Integer
+        Get
+            Return mUTCDay
+        End Get
+    End Property
+    Public Property UTCHour As Integer
+        Get
+            Return mUTCHour
+        End Get
+    End Property
+    Public Property UTCMinute As Integer
+        Get
+            Return mUTCMinute
+        End Get
+    End Property
+    Public Property UTCSecond As Integer
+        Get
+            Return mUTCSecond
+        End Get
+    End Property
+    Public Property UTCMillisecond As Integer
+        Get
+            Return mUTCMillisecond
+        End Get
+    End Property
+
+    ''' Canonical UTC rendering using portable Gregorian fields, not native DateTime formatting.
+    Public Function ToISO8601() As String
+        Return String.Right("0000" + Str(mUTCYear), 4) + "-" + String.Right("0" + Str(mUTCMonth), 2) + "-" + String.Right("0" + Str(mUTCDay), 2) + "T" + String.Right("0" + Str(mUTCHour), 2) + ":" + String.Right("0" + Str(mUTCMinute), 2) + ":" + String.Right("0" + Str(mUTCSecond), 2) + "." + String.Right("00" + Str(mUTCMillisecond), 3) + "Z"
+    End Function
+End Class
+
+Private Function TimestampDigits(characters As Array Of String, start As Integer, count As Integer) As Integer
+    Dim decoded As Integer = 0
+    For i As Integer = start To start + count - 1
+        If i >= Array.Count(characters) Then Return -1
+        Dim digit As Integer = String.Asc(characters(i)) - 48
+        If digit < 0 Or digit > 9 Then Return -1
+        decoded = decoded * 10 + digit
+    Next
+    Return decoded
+End Function
+
+Private Function TimestampLeapYear(year As Integer) As Boolean
+    Return year Mod 4 = 0 And (year Mod 100 <> 0 Or year Mod 400 = 0)
+End Function
+
+Private Function TimestampMonthDays(year As Integer, month As Integer) As Integer
+    Select Case month
+        Case 4, 6, 9, 11
+            Return 30
+        Case 2
+            If TimestampLeapYear(year) Then Return 29
+            Return 28
+        Case Else
+            Return 31
+    End Select
+End Function
+
+Private Function TimestampDaysBeforeYear(year As Integer) As Integer
+    Dim previous As Integer = year - 1
+    Return previous * 365 + previous \ 4 - previous \ 100 + previous \ 400
+End Function
+
+''' Parse an exact extended-calendar timestamp; invalid/unsupported forms return Err(String).
+Public Function ParseTimestamp(text As String) As Result Of ParsedTimestamp, String
+    Dim length As Integer = String.Len(text)
+    If length < 20 Or length > 35 Then Return Err("syntax: timestamp must contain a complete date, time and explicit offset (20..35 characters)")
+    Dim characters As Array Of String = String.Chars(text)
+    If characters(4) <> "-" Or characters(7) <> "-" Or characters(13) <> ":" Or characters(16) <> ":" Then Return Err("syntax: expected YYYY-MM-DDTHH:MM:SS")
+    If String.Compare(characters(10), "T", True) <> 0 And String.Compare(characters(10), "t", True) <> 0 Then Return Err("syntax: date and time must be separated by T or t")
+    Dim year As Integer = TimestampDigits(characters, 0, 4)
+    Dim month As Integer = TimestampDigits(characters, 5, 2)
+    Dim day As Integer = TimestampDigits(characters, 8, 2)
+    Dim hour As Integer = TimestampDigits(characters, 11, 2)
+    Dim minute As Integer = TimestampDigits(characters, 14, 2)
+    Dim second As Integer = TimestampDigits(characters, 17, 2)
+    If year < 1 Or year > 9999 Then Return Err("calendar: year must contain four ASCII digits in 0001..9999")
+    If month < 1 Or month > 12 Then Return Err("calendar: month must be in 01..12")
+    If day < 1 Or day > TimestampMonthDays(year, month) Then Return Err("calendar: day is invalid for the selected Gregorian month/year")
+    If hour < 0 Or hour > 23 Then Return Err("calendar: hour must be in 00..23; 24:00 is unsupported")
+    If minute < 0 Or minute > 59 Then Return Err("calendar: minute must be in 00..59")
+    If second < 0 Or second > 59 Then Return Err("calendar: second must be in 00..59; leap seconds are unsupported")
+    Dim position As Integer = 19
+    Dim fractionDigits As Integer = 0
+    Dim millis As Integer = 0
+    If characters(position) = "." Then
+        position += 1
+        While position < length
+            Dim digit As Integer = String.Asc(characters(position)) - 48
+            If digit < 0 Or digit > 9 Then Exit While
+            fractionDigits += 1
+            If fractionDigits > 9 Then Return Err("precision: at most nine fractional digits are supported")
+            If fractionDigits <= 3 Then
+                millis = millis * 10 + digit
+            ElseIf digit <> 0 Then
+                Return Err("precision: nonzero sub-millisecond digits cannot be represented")
+            End If
+            position += 1
+        End While
+        If fractionDigits = 0 Then Return Err("syntax: decimal point must be followed by fractional ASCII digits")
+        If fractionDigits = 1 Then millis *= 100
+        If fractionDigits = 2 Then millis *= 10
+    End If
+    If position >= length Then Return Err("offset: explicit Z or signed HH:MM offset is required")
+    Dim offsetSeconds As Integer = 0
+    Dim offsetToken As String = characters(position)
+    If String.Compare(offsetToken, "Z", True) = 0 Or String.Compare(offsetToken, "z", True) = 0 Then
+        If position + 1 <> length Then Return Err("syntax: trailing characters after UTC designator")
+    Else
+        If offsetToken <> "+" And offsetToken <> "-" Then Return Err("offset: expected Z or signed HH:MM offset")
+        If position + 6 <> length Then Return Err("offset: signed offset must use exact HH:MM form")
+        If characters(position + 3) <> ":" Then Return Err("offset: separator must be a colon")
+        Dim offsetHour As Integer = TimestampDigits(characters, position + 1, 2)
+        Dim offsetMinute As Integer = TimestampDigits(characters, position + 4, 2)
+        If offsetHour < 0 Or offsetHour > 23 Or offsetMinute < 0 Or offsetMinute > 59 Then Return Err("offset: hours must be 00..23 and minutes 00..59")
+        offsetSeconds = offsetHour * 3600 + offsetMinute * 60
+        If offsetToken = "-" Then
+            If offsetSeconds = 0 Then Return Err("offset: RFC3339 -00:00 denotes an unknown offset and is unsupported")
+            offsetSeconds = -offsetSeconds
+        End If
+    End If
+    ' Count Gregorian days from 0001-01-01, avoiding host timezone/calendar parsing.
+    Dim days As Integer = TimestampDaysBeforeYear(year)
+    For selectedMonth As Integer = 1 To month - 1
+        days += TimestampMonthDays(year, selectedMonth)
+    Next
+    days += day - 1
+    Dim unixMillis As Integer = (days - 719162) * 86400000 + hour * 3600000 + minute * 60000 + second * 1000 + millis - offsetSeconds * 1000
+    If unixMillis < -62135596800000 Or unixMillis > 253402300799999 Then Return Err("range: resulting UTC instant must remain in years 0001..9999")
+    Return Ok(New ParsedTimestamp(text, unixMillis, offsetSeconds, fractionDigits))
+End Function
+
+''' Validate every wire byte before conversion, including embedded/trailing NUL.
+Public Function ParseTimestampBytes(data As Bytes) As Result Of ParsedTimestamp, String
+    If data = Nil Then Return Err("syntax: timestamp bytes are required")
+    If data.Count < 20 Or data.Count > 35 Then Return Err("syntax: timestamp bytes must contain a complete explicit-offset timestamp (20..35 bytes)")
+    For i As Integer = 0 To data.Count - 1
+        Dim octet As Integer = data.Item(i)
+        If octet < 32 Or octet > 126 Then Return Err("syntax: timestamp bytes must contain printable ASCII without NUL or controls")
+    Next
+    Return ParseTimestamp(data.ToString(Text.Encodings.UTF8))
+End Function
+
+''' Throw InvalidArgumentException with the parse reason instead of returning Err.
+Public Function RequireTimestamp(text As String) As ParsedTimestamp
+    Dim parsed As Result Of ParsedTimestamp, String = ParseTimestamp(text)
+    If parsed.IsErr Then Throw New InvalidArgumentException(parsed.Error)
+    Return parsed.Value
+End Function

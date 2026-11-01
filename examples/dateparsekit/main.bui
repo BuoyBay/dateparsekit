@@ -1,0 +1,29 @@
+Import dateparsekit
+
+Sub Main()
+    ' A local New Year's timestamp can still belong to the previous UTC year.
+    Dim newYear As ParsedTimestamp = RequireTimestamp("2027-01-01T00:15:00+05:45")
+    Print newYear.OriginalText
+    Print newYear.ToISO8601()
+
+    ' Exact milliseconds before the epoch remain negative, without rounding.
+    Dim beforeEpoch As ParsedTimestamp = RequireTimestamp("1969-12-31T23:59:59.999Z")
+    Print Str(beforeEpoch.UnixMillis)
+
+    ' Validate wire bytes before String conversion can lose a NUL suffix.
+    Dim wire As Bytes = Bytes.FromHex("323032362d31302d33315431323a33343a35365a006a756e6b").Value
+    Dim incoming As Result Of ParsedTimestamp, String = ParseTimestampBytes(wire)
+    If incoming.IsErr Then
+        Print "Rejected unsafe wire timestamp"
+    Else
+        Throw New Exception("Unsafe timestamp accepted")
+    End If
+
+    ' RequireTimestamp exposes the same bad-input contract as an exception.
+    Try
+        Dim unknownOffset As ParsedTimestamp = RequireTimestamp("2026-10-31T12:34:56-00:00")
+        Throw New Exception("Unknown offset accepted")
+    Catch error As InvalidArgumentException
+        Print "Rejected unknown offset"
+    End Try
+End Sub
