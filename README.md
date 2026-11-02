@@ -1,4 +1,4 @@
-# Strict Gregorian timestamps with explicit offsets
+# Strict Gregorian timestamps
 
 Strict timestamp parsing, returning an exact UTC instant together with
 the source offset and fractional precision. Copy `dateparsekit-0.1.0.buipkg` into
