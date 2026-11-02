@@ -1,1 +1,1 @@
-{"schema":1,"name":"dateparsekit","version":"0.1.0","description":"Strict Gregorian RFC3339/ISO8601-profile timestamps with explicit offsets and millisecond precision"}
+{"schema":1,"name":"dateparsekit","version":"0.1.0","description":"Strict Gregorian timestamps with explicit offsets"}
