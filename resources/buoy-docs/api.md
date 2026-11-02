@@ -47,5 +47,4 @@ are rejected. Inputs are at most 35 characters. This profile is a subset of ISO
 
 [Overview](index.md)
 
-
 [Full typed API: properties, parameters, defaults, and returns](typed-api.md)

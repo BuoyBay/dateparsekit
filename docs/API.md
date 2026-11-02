@@ -61,25 +61,9 @@ entrypoint validates the complete 20..35-byte printable-ASCII payload first,
 including embedded/trailing NUL and controls. Parsed values retain no mutable
 caller-owned byte buffer.
 
-## Verification and build
+## Source and format
 
-```sh
-/usr/bin/buoy pkg seal . -o packages/dateparsekit-0.1.0.buipkg
-```
-
-The verifier seals a fresh isolated package, compiler-checks module and consumer
-for all six desktop targets, and runs Linux regression tests plus 4,096
-deterministic randomized comparisons with Python datetime. Boundary vectors cover
-years 0001/9999, pre-epoch values, month/year transitions, zero fractions and large
-offsets. Invalid cases cover leap dates, leap seconds, unknown offsets, precision,
-ASCII lookalikes, embedded NUL, trailing controls and suffix garbage. Tests compare
-exact milliseconds, portable UTC calendar properties and canonical UTC text
-without relying on built-in calendar accessors or date formatting. The same
-4,153-case consumer passes native macOS ARM64 and Windows x86_64. Reproduce with
-`tests/standard_library_macos.py` and `tests/standard_library_windows.py`.
-
-`BUOY` and `BPM_PACKAGER` override the compiler and sealer. The implementation is
-new Buoy code informed by the public [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339.txt)
-format and Gregorian arithmetic; no declaresub implementation is copied.
-
-Test suites and fixtures are maintainer-local and are not part of this public repository.
+The implementation uses Gregorian arithmetic and the public
+[RFC 3339](https://www.rfc-editor.org/rfc/rfc3339.txt) format. The repository README
+shows package installation and source building. Calendar ranges, accepted offsets
+and precision limits remain explicit parts of the parser contract.

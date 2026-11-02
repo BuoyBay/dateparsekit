@@ -1,6 +1,6 @@
 # Parse strict Gregorian timestamps with explicit offsets
 
-Strict timestamp parsing for Buoy, returning an exact UTC instant together with
+Strict timestamp parsing, returning an exact UTC instant together with
 the source offset and fractional precision. Copy `dateparsekit-0.1.0.buipkg` into
 a consumer's packages directory, then `Import dateparsekit`. No other package,
 native parser, locale setting or operating-system timezone database is required.
@@ -54,7 +54,6 @@ On your own machine, install Buoy and run:
 buoy ai init --both
 ```
 
-The generated agent files and editor settings stay local and are ignored by Git.
 
 ## Contributing
 

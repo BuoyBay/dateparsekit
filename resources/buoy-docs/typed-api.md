@@ -50,8 +50,6 @@ No parameters.
 | --- |
 | `String` |
 
-## DateParseKit functions
-
 ### ParseTimestamp
 
 `Public Function ParseTimestamp(text As String) As Result Of ParsedTimestamp, String`
